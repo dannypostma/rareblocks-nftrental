@@ -1,0 +1,22 @@
+{
+  "name": "contract",
+  "version": "1.0.0",
+  "description": "",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "truffle test",
+    "verify-goerli": "truffle run verify RareBlocks --network goerli",
+    "deploy-local": "truffle migrate --network development",
+    "deploy-goerli": "truffle migrate --network goerli"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.3.2",
+    "dotenv": "^10.0.0",
+    "truffle-plugin-verify": "^0.5.15"
+  }
+}
