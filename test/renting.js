@@ -118,6 +118,7 @@ contract("RareBlocks", function (accounts) {
     it("should be able to rent a staked token", async function(){
       const value = 1000000000000000000;
       const result = await rentingInstance.rent(charlie, 16, {from: charlie, value});
+      // console.log(result)
       assert.equal(result.logs[0].event, 'Rented');
       assert.equal(result.logs[0].args[0], charlie)
     });
@@ -125,7 +126,7 @@ contract("RareBlocks", function (accounts) {
     
     it("should get renting information", async function(){
       const result = await rentingInstance.getWalletRentStatus(charlie);
-      console.log(BigInt(result[2]))
+      // console.log(BigInt(result[2]))
     });
 
     it("should error if not rented for address", async function(){
@@ -162,6 +163,43 @@ contract("RareBlocks", function (accounts) {
       await utils.shouldThrow(rentingInstance.withdrawRentBalance()); // Payout rent
     });
   });
+
+  describe('Wanting to list the rentable tokens, it', () => {
+    it("should get a list of all rentable tokens, with array[0] is id 16 and price 1Eth", async function(){
+      const result = await rentingInstance.getListOfRentableTokens();
+      assert.equal(BigInt(result[0]), 16n);
+      assert.equal(BigInt(result[1]), 1000000000000000000n);
+    });
+    
+    it("should NOT allow bob to change price of tokenId 16", async function(){
+      await utils.shouldThrow(rentingInstance.setPrice(16, 10000000000000, {from: charlie}));
+    });
+    
+    it("should allow Alice to change price of tokenId 16 to 0.1E", async function(){
+      const newPrice = 100000000000000000; // Rent minus gas costs
+      const result = await rentingInstance.setPrice(16, BigInt(newPrice));
+    });
+
+    it("should list for 0.1Eth now", async function(){
+      const result = await rentingInstance.getListOfRentableTokens();
+      assert.equal(BigInt(result[0]), 16n);
+      assert.equal(BigInt(result[1]), 100000000000000000n);
+    });
+    
+  });
+
+  describe('Before being able to unstake, it', () => {
+
+    it("should set the token isRentable to false", async function(){
+      await rentingInstance.toggleIsRentable(16);
+    });
+
+    it("should return no listed tokens for rent", async function(){
+      const result = await rentingInstance.getListOfRentableTokens();
+      assert.equal(BigInt(result[0]), 0)
+    });
+  });
+  
 
 
 
