@@ -110,11 +110,18 @@ contract("RareBlocks", function (accounts) {
       await utils.shouldThrow(rentingInstance.rent(charlie, 20))
     });
 
+    it("should NOT be able to rent a staked token for below the price", async function(){
+      const value = 800000000000000000;
+      await utils.shouldThrow(rentingInstance.rent(charlie, 16, {from: charlie, value}));
+    });
+
     it("should be able to rent a staked token", async function(){
-      const result = await rentingInstance.rent(charlie, 16);
+      const value = 1000000000000000000;
+      const result = await rentingInstance.rent(charlie, 16, {from: charlie, value});
       assert.equal(result.logs[0].event, 'Rented');
       assert.equal(result.logs[0].args[0], charlie)
     });
+
     
     it("should get renting information", async function(){
       const result = await rentingInstance.getWalletRentStatus(charlie);
@@ -129,6 +136,31 @@ contract("RareBlocks", function (accounts) {
       await utils.shouldThrow(rentingInstance.unstakeAccessPass(16));
     });
     
+  });
+
+  describe('When cashing out rent, it', () => {
+
+    it("should show a balance of 1Eth for Alice", async function(){
+      const result = await rentingInstance.getRentBalance(alice);
+      assert.equal(BigInt(result), 1000000000000000000n);
+    });
+
+    it("should payout rent to Alice", async function(){
+      const rentValue = 980000000000000000; // Rent minus gas costs
+      const aliceCurrentValue = await web3.eth.getBalance(alice);
+
+      await rentingInstance.withdrawRentBalance(); // Payout rent
+
+      const aliceNewValue = await web3.eth.getBalance(alice);
+      const contractNewValue = await web3.eth.getBalance(rentingInstance.address);
+
+      assert.isAbove(aliceNewValue - aliceCurrentValue, rentValue);
+      assert.equal(contractNewValue, 0);
+    });
+
+    it("should not be able to payout rent to Alice since it's empty", async function(){
+      await utils.shouldThrow(rentingInstance.withdrawRentBalance()); // Payout rent
+    });
   });
 
 

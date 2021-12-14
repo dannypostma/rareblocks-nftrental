@@ -16,6 +16,7 @@ contract Renting is IERC721Receiver{
         uint256 tokenId;
         address owner;
         bool isRentable;
+        uint256 price; 
     }
 
     struct Rent {
@@ -27,6 +28,8 @@ contract Renting is IERC721Receiver{
     mapping(uint256 => Stake) stakes; // Track staked tokens
     mapping(uint256 => Rent) rents; // Track rented tokens
     mapping(address => uint256) renterToToken; // Track rented token for address
+    mapping(address => uint256) rentBalance; // Track rent balance payable to token holder
+
 
     event Rented(address indexed _address, uint256 tokenId); // Renting event
 
@@ -41,7 +44,8 @@ contract Renting is IERC721Receiver{
         stakes[tokenId] = Stake({
             tokenId: tokenId,
             owner: from,
-            isRentable: true
+            isRentable: true,
+            price: 1 ether
         });
         return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
     } 
@@ -60,9 +64,18 @@ contract Renting is IERC721Receiver{
         delete stakes[id];
     }
 
-    function rent(address renter, uint256 tokenId) public {
+    function rent(address renter, uint256 tokenId) public payable {
         require(stakes[tokenId].owner != address(0), "This token is not staked.");
         require(rents[tokenId].renter == address(0), "This token is already rented out.");
+        require(stakes[tokenId].price == msg.value, "Not enough ether send to pay for rent.");
+
+        // Remove mapping for expired rent
+        if(rents[tokenId].rentEndDate < block.timestamp){
+            delete rents[tokenId];
+            delete renterToToken[rents[tokenId].renter];
+        }
+
+        // @TODO Check if address is already renting a token
 
         // Map rent information
         rents[tokenId] = Rent({
@@ -73,7 +86,11 @@ contract Renting is IERC721Receiver{
 
         // Map address to tokenId
         renterToToken[renter] = tokenId;
-        
+
+
+        // Map rent balance to staker
+        rentBalance[stakes[tokenId].owner] = msg.value;
+
         emit Rented(renter, tokenId);
     }
 
@@ -82,5 +99,16 @@ contract Renting is IERC721Receiver{
         require(rents[id].renter != address(0), "This address has not rented a token");
         return (rents[id].tokenId, rents[id].renter, rents[id].rentEndDate);
     }
-    
+
+    function getRentBalance(address staker) public view returns (uint256){
+        return rentBalance[staker];
+    }
+
+    function withdrawRentBalance() public{       
+        uint balance = rentBalance[msg.sender];
+        require(balance > 0, "You do not have any rent");
+        payable(msg.sender).transfer(balance);
+    }
+
+
 }
