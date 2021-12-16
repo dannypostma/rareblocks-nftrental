@@ -9,7 +9,7 @@ const utils = require("./helpers/utils");
  */
 
 contract("RareBlocks", function (accounts) {
-  let [alice, bob, charlie] = accounts;
+  let [alice, bob, charlie, treasury] = accounts;
   BigInt.prototype.toJSON = function() {       
     return this.toString()
   }
@@ -54,17 +54,24 @@ contract("RareBlocks", function (accounts) {
       const result = await instance.ownerOf(16);
       assert.equal(result, alice);
     });
+
+    it("should set Rareblocks contract address", async function(){
+      await rentingInstance.setRareblocksContractAddress(instance.address);
+    });
   });
 
 
 
   describe('When staking, it', () => {
 
+    
+
     it("should send 1 NFT from Alice to Renting Contract", async function () {
       const to = rentingInstance.address; // Renting Contract Address
       const from = alice;
       const tokenId = 16;
       const result = await instance.safeTransferFrom(from, to, tokenId);
+      assert.equal(result.receipt.logs[0].address, instance.address)
     });
 
     // Send NFT to Staking contract
@@ -78,9 +85,7 @@ contract("RareBlocks", function (accounts) {
       assert.equal(result[1], alice);
     });
 
-    it("should set Rareblocks contract address", async function(){
-      await rentingInstance.setRareblocksContractAddress(instance.address);
-    });
+
     
     it("should unstake NFT back to Alice", async function(){
       await rentingInstance.unstakeAccessPass(16);
@@ -147,21 +152,39 @@ contract("RareBlocks", function (accounts) {
     });
 
     it("should payout rent to Alice", async function(){
-      const rentValue = 980000000000000000; // Rent minus gas costs
+      const rentValue = 880000000000000000; // Rent minus gas costs
       const aliceCurrentValue = await web3.eth.getBalance(alice);
 
       await rentingInstance.withdrawRentBalance(); // Payout rent
 
       const aliceNewValue = await web3.eth.getBalance(alice);
-      const contractNewValue = await web3.eth.getBalance(rentingInstance.address);
+      // const contractNewValue = await web3.eth.getBalance(rentingInstance.address);
+      const unclaimedTreasuryCommission = await rentingInstance.getTotalUnclaimedCommission();
 
+      assert.equal(BigInt(unclaimedTreasuryCommission), 100000000000000000n); // Should have 0.1E
       assert.isAbove(aliceNewValue - aliceCurrentValue, rentValue);
-      assert.equal(contractNewValue, 0);
     });
 
     it("should not be able to payout rent to Alice since it's empty", async function(){
       await utils.shouldThrow(rentingInstance.withdrawRentBalance()); // Payout rent
     });
+
+    it("should be able to cash out treasury commission", async function(){
+      const startAmount = await web3.eth.getBalance(treasury)
+      await rentingInstance.withdrawTreasuryCommissionBalance();
+      const newAmount = await web3.eth.getBalance(treasury);
+      assert.equal(newAmount - startAmount, 100000000000000000);
+    });
+
+    it("should have no more commission left", async function(){
+      const unclaimedTreasuryCommission = await rentingInstance.getTotalUnclaimedCommission();
+      assert.equal(BigInt(unclaimedTreasuryCommission), 0n)
+    });
+
+    it("should not be able to payout any commission", async function(){
+      await utils.shouldThrow(rentingInstance.withdrawTreasuryCommissionBalance());
+    });
+    
   });
 
   describe('Wanting to list the rentable tokens, it', () => {
